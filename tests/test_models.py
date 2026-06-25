@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -275,3 +275,67 @@ class TestProductModel(unittest.TestCase):
         # to ensure that all the retrieved products have the correct category.
         for product in found:
             self.assertEqual(product.category, category)
+
+    def test_update_without_id_raises_error(self):
+        """Update without id"""
+        product = ProductFactory()
+        product.id = None
+
+        with self.assertRaises(DataValidationError):
+            product.update()
+
+    def test_deserialize_invalid_available(self):
+        """It should not deserialize a Product with invalid available type"""
+        data = {
+            "name": "Shirt",
+            "description": "Test",
+            "price": "10.00",
+            "available": "yes",
+            "category": "CLOTHS",
+        }
+
+        product = Product()
+
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_deserialize_invalid_category(self):
+        """It should not deserialize a Product with invalid category"""
+
+        data = {
+            "name": "Shirt",
+            "description": "Test",
+            "price": "10.00",
+            "available": True,
+            "category": "ANYTHING",
+        }
+
+        product = Product()
+
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_deserialize_with_none(self):
+        """It should not deserialize a Product with None"""
+        product = Product()
+        data = None
+
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data)
+
+    def test_find_by_price_decimal(self):
+        """Test find by price decimal"""
+        product = ProductFactory(price=Decimal("19.99"))
+        product.create()
+
+        products = Product.find_by_price(Decimal("19.99"))
+        self.assertEqual(products.count(), 1)
+
+    def test_find_by_price_string_with_quotes(self):
+        """Test find by price string with quotes"""
+
+        product = ProductFactory(price=Decimal("19.99"))
+        product.create()
+
+        products = Product.find_by_price('"19.99"')
+        self.assertEqual(products.count(), 1)
